@@ -1,44 +1,37 @@
 <?php
-// Copyright 2004-present Facebook. All Rights Reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 namespace Facebook\WebDriver;
 
 use Facebook\WebDriver\Remote\WebDriverBrowserType;
 
 /**
- * @coversDefaultClass \Facebook\WebDriver\Interactions\WebDriverActions
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverButtonReleaseAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverClickAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverClickAndHoldAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverContextClickAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverCoordinates
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverDoubleClickAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverKeyDownAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverKeysRelatedAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverKeyUpAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverMouseAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverMouseMoveAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverMoveToOffsetAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverSendKeysAction
+ * @covers \Facebook\WebDriver\Interactions\Internal\WebDriverSingleKeyAction
+ * @covers \Facebook\WebDriver\Interactions\WebDriverActions
  */
 class WebDriverActionsTest extends WebDriverTestCase
 {
-    protected function setUp()
-    {
-        parent::setUp();
+    use RetrieveEventsTrait;
 
-        $this->driver->get($this->getTestPageUrl('events.html'));
-    }
-
-    /**
-     * @covers ::__construct
-     * @covers ::click
-     * @covers ::perform
-     */
     public function testShouldClickOnElement()
     {
         if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
             $this->markTestSkipped('Not supported by HtmlUnit browser');
         }
+
+        $this->driver->get($this->getTestPageUrl('events.html'));
 
         $element = $this->driver->findElement(WebDriverBy::id('item-1'));
 
@@ -46,23 +39,25 @@ class WebDriverActionsTest extends WebDriverTestCase
             ->click($element)
             ->perform();
 
-        $this->assertSame(
-            ['mouseover item-1', 'mousedown item-1', 'mouseup item-1', 'click item-1'],
-            $this->retrieveLoggedEvents()
-        );
+        $logs = ['mouseover item-1', 'mousedown item-1', 'mouseup item-1', 'click item-1'];
+        $loggedEvents = $this->retrieveLoggedMouseEvents();
+
+        if (getenv('GECKODRIVER') === '1') {
+            $loggedEvents = array_slice($loggedEvents, 0, count($logs));
+            // Firefox sometimes triggers some extra events
+            // it's not related to Geckodriver, it's Firefox's own behavior
+        }
+
+        $this->assertSame($logs, $loggedEvents);
     }
 
-    /**
-     * @covers ::__construct
-     * @covers ::clickAndHold
-     * @covers ::release
-     * @covers ::perform
-     */
     public function testShouldClickAndHoldOnElementAndRelease()
     {
         if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
             $this->markTestSkipped('Not supported by HtmlUnit browser');
         }
+
+        $this->driver->get($this->getTestPageUrl('events.html'));
 
         $element = $this->driver->findElement(WebDriverBy::id('item-1'));
 
@@ -71,16 +66,18 @@ class WebDriverActionsTest extends WebDriverTestCase
             ->release()
             ->perform();
 
-        $this->assertSame(
-            ['mouseover item-1', 'mousedown item-1', 'mouseup item-1', 'click item-1'],
-            $this->retrieveLoggedEvents()
-        );
+        if (self::isW3cProtocolBuild()) {
+            $this->assertArraySubset(['mouseover item-1', 'mousedown item-1'], $this->retrieveLoggedMouseEvents());
+        } else {
+            $this->assertSame(
+                ['mouseover item-1', 'mousedown item-1', 'mouseup item-1', 'click item-1'],
+                $this->retrieveLoggedMouseEvents()
+            );
+        }
     }
 
     /**
-     * @covers ::__construct
-     * @covers ::contextClick
-     * @covers ::perform
+     * @group exclude-saucelabs
      */
     public function testShouldContextClickOnElement()
     {
@@ -92,29 +89,28 @@ class WebDriverActionsTest extends WebDriverTestCase
             $this->markTestSkipped('Getting stuck in EdgeDriver');
         }
 
+        $this->driver->get($this->getTestPageUrl('events.html'));
+
         $element = $this->driver->findElement(WebDriverBy::id('item-2'));
 
         $this->driver->action()
             ->contextClick($element)
             ->perform();
 
-        $loggedEvents = $this->retrieveLoggedEvents();
+        $loggedEvents = $this->retrieveLoggedMouseEvents();
 
         $this->assertContains('mousedown item-2', $loggedEvents);
         $this->assertContains('mouseup item-2', $loggedEvents);
         $this->assertContains('contextmenu item-2', $loggedEvents);
     }
 
-    /**
-     * @covers ::__construct
-     * @covers ::doubleClick
-     * @covers ::perform
-     */
     public function testShouldDoubleClickOnElement()
     {
         if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
             $this->markTestSkipped('Not supported by HtmlUnit browser');
         }
+
+        $this->driver->get($this->getTestPageUrl('events.html'));
 
         $element = $this->driver->findElement(WebDriverBy::id('item-3'));
 
@@ -122,19 +118,173 @@ class WebDriverActionsTest extends WebDriverTestCase
             ->doubleClick($element)
             ->perform();
 
+        $this->assertContains('dblclick item-3', $this->retrieveLoggedMouseEvents());
+    }
+
+    /**
+     * @group exclude-saucelabs
+     */
+    public function testShouldSendKeysUpAndDown()
+    {
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
+            $this->markTestSkipped('Not supported by HtmlUnit browser');
+        }
+
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::FIREFOX) {
+            self::skipForJsonWireProtocol('Broken in legacy Firefox');
+        }
+
+        $this->driver->get($this->getTestPageUrl('events.html'));
+
+        $this->driver->action()
+            ->keyDown(null, WebDriverKeys::CONTROL)
+            ->keyUp(null, WebDriverKeys::CONTROL)
+            ->sendKeys(null, 'ab')
+            ->perform();
+
+        $events = $this->retrieveLoggedKeyboardEvents();
+
+        $this->assertEquals(
+            [
+                'keydown "Control"',
+                'keyup "Control"',
+                'keydown "a"',
+                'keyup "a"',
+                'keydown "b"',
+                'keyup "b"',
+            ],
+            $events
+        );
+    }
+
+    public function testShouldMoveToElement()
+    {
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
+            $this->markTestSkipped('Not supported by HtmlUnit browser');
+        }
+
+        $this->driver->get($this->getTestPageUrl('sortable.html'));
+
+        $item13 = $this->driver->findElement(WebDriverBy::id('item-1-3'));
+        $item24 = $this->driver->findElement(WebDriverBy::id('item-2-4'));
+
+        $this->driver->action()
+            ->clickAndHold($item13)
+            ->moveToElement($item24)
+            ->release()
+            ->perform();
+
         $this->assertSame(
-            ['mouseover item-3', 'mousedown item-3', 'mouseup item-3', 'click item-3', 'dblclick item-3'],
-            $this->retrieveLoggedEvents()
+            [['1-1', '1-2', '1-4', '1-5'], ['2-1', '2-2', '2-3', '2-4', '1-3', '2-5']],
+            $this->retrieveListContent()
+        );
+    }
+
+    public function testShouldMoveByOffset()
+    {
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
+            $this->markTestSkipped('Not supported by HtmlUnit browser');
+        }
+
+        $this->driver->get($this->getTestPageUrl('sortable.html'));
+
+        $item13 = $this->driver->findElement(WebDriverBy::id('item-1-3'));
+
+        $this->driver->action()
+            ->clickAndHold($item13)
+            ->moveByOffset(100, 55)
+            ->release()
+            ->perform();
+
+        $this->assertSame(
+            [['1-1', '1-2', '1-4', '1-5'], ['2-1', '2-2', '2-3', '2-4', '1-3', '2-5']],
+            $this->retrieveListContent()
+        );
+    }
+
+    /**
+     * @group exclude-saucelabs
+     */
+    public function testShouldDragAndDrop()
+    {
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
+            $this->markTestSkipped('Not supported by HtmlUnit browser');
+        }
+
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::FIREFOX) {
+            self::skipForJsonWireProtocol('Broken in legacy Firefox');
+        }
+
+        $this->driver->get($this->getTestPageUrl('sortable.html'));
+
+        $item13 = $this->driver->findElement(WebDriverBy::id('item-1-3'));
+        $item24 = $this->driver->findElement(WebDriverBy::id('item-2-4'));
+
+        $this->driver->action()
+            ->dragAndDrop($item13, $item24)
+            ->perform();
+
+        $this->assertSame(
+            [['1-1', '1-2', '1-4', '1-5'], ['2-1', '2-2', '2-3', '2-4', '1-3', '2-5']],
+            $this->retrieveListContent()
+        );
+
+        $item21 = $this->driver->findElement(WebDriverBy::id('item-2-1'));
+
+        $this->driver->action()
+            ->dragAndDrop($item24, $item21)
+            ->perform();
+
+        $this->assertSame(
+            [['1-1', '1-2', '1-4', '1-5'], ['2-4', '2-1', '2-2', '2-3', '1-3', '2-5']],
+            $this->retrieveListContent()
+        );
+    }
+
+    public function testShouldDragAndDropBy()
+    {
+        if ($this->desiredCapabilities->getBrowserName() === WebDriverBrowserType::HTMLUNIT) {
+            $this->markTestSkipped('Not supported by HtmlUnit browser');
+        }
+
+        $this->driver->get($this->getTestPageUrl('sortable.html'));
+
+        $item13 = $this->driver->findElement(WebDriverBy::id('item-1-3'));
+
+        $this->driver->action()
+            ->dragAndDropBy($item13, 100, 55)
+            ->perform();
+
+        $this->assertSame(
+            [['1-1', '1-2', '1-4', '1-5'], ['2-1', '2-2', '2-3', '2-4', '1-3', '2-5']],
+            $this->retrieveListContent()
+        );
+
+        $item25 = $this->driver->findElement(WebDriverBy::id('item-2-5'));
+        $item22 = $this->driver->findElement(WebDriverBy::id('item-2-2'));
+
+        $this->driver->action()
+            ->dragAndDropBy($item25, 0, -130)
+            ->dragAndDropBy($item22, -100, -35)
+            ->perform();
+
+        $this->assertSame(
+            [['1-1', '2-2', '1-2', '1-4', '1-5'], ['2-1', '2-5', '2-3', '2-4', '1-3']],
+            $this->retrieveListContent()
         );
     }
 
     /**
      * @return array
      */
-    private function retrieveLoggedEvents()
+    private function retrieveListContent()
     {
-        $logElement = $this->driver->findElement(WebDriverBy::id('log'));
+        $list1 = $this->driver->findElement(WebDriverBy::cssSelector('#sortable1'));
+        $list2 = $this->driver->findElement(WebDriverBy::cssSelector('#sortable2'));
 
-        return explode("\n", $logElement->getText());
+        return [
+            explode("\n", $list1->getText()),
+            explode("\n", $list2->getText()),
+        ];
     }
 }

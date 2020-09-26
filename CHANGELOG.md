@@ -2,8 +2,62 @@
 This project versioning adheres to [Semantic Versioning](http://semver.org/).
 
 ## Unreleased
+### Fixed
+- Make `alertIsPresent()` condition working in W3C mode.
+- `RemoteWebDriver::create()` cannot be used without providing the second parameter (which is in fact optional).
+
+## 1.8.2 - 2020-03-04
+### Changed
+- Reimplement element `equals()` method to be working in W3C mode.
+- New instance of `RemoteWebDriver` created via `createBySessionID()` by default expects W3C mode. This could be disabled using fifth parameter of `createBySessionID()`.
+- Disable JSON viewer in Firefox to let JSON response be rendered as-is.
+
+### Fixed
+- Properly read fifth parameter whether W3C compliant instance should be created when using `createBySessionID()`.
+- Creating of Firefox profile with libzip 1.6+ (eg. on Mac OS Catalina).
+
+## 1.8.1 - 2020-02-17
+### Fixed
+- Accept array as possible input to `sendKeys()` method. (Unintentional BC break in 1.8.0.)
+- Use relative offset when moving mouse pointer in W3C WebDriver mode.
+
+## 1.8.0 - 2020-02-10
+### Added
+- Experimental W3C WebDriver protocol support. The protocol will be used automatically when remote end (like Geckodriver, newer Chromedriver etc.) supports it.
+- `getStatus()` method of `RemoteWebDriver` to get information about remote-end readiness to create new sessions.
+- `takeElementScreenshot()` method of `RemoteWebElement` to do the obvious - take screenshot of the particular element.
+- Support for sending custom commands via `executeCustomCommand()`. See [wiki](https://github.com/php-webdriver/php-webdriver/wiki/Custom-commands) for more information.
+
+### Changed
+- The repository was migrated to [`php-webdriver/php-webdriver`](https://github.com/php-webdriver/php-webdriver/).
+- The Packagist package was renamed to [`php-webdriver/webdriver`](https://packagist.org/packages/php-webdriver/webdriver) and the original [`facebook/webdriver`](https://packagist.org/packages/facebook/webdriver) was marked as abandoned.
+- Revert no longer needed workaround for Chromedriver bug [2943](https://bugs.chromium.org/p/chromedriver/issues/detail?id=2943).
+- Allow installation of Symfony 5 components.
+- Rename environment variable used to pass path to ChromeDriver executable from `webdriver.chrome.driver` to `WEBDRIVER_CHROME_DRIVER`. However the old one also still works to keep backward compatibility
+- If subdirectories in a path to screenshot destination does not exists (using `takeScreenshot()` or `takeElementScreenshot()` methods), they are automatically created.
+- When zip archive cannot be created during file upload, throw an exception instead of silently returning false.
+- `WebDriverNavigation` and `EventFiringWebDriverNavigation` now both implement new `WebDriverNavigationInterface`.
+
+### Fixed
+- `WebDriverExpectedCondition::presenceOfElementLocated()` works correctly when used within `WebDriverExpectedCondition::not()`.
+- Improper behavior of Microsoft Edge when retrieving all cookies via `getCookies()` (it was causing fatal error  when there were no cookies).
+- Avoid "path is not canonical" error when uploading file to Chromedriver.
+
+## 1.7.1 - 2019-06-13
+### Fixed
+- Error `Call to a member function toArray()` if capabilities were already converted to an array.
+- Temporarily do not send capabilities to disable W3C WebDriver protocol when BrowserStack hub is used.
+
+## 1.7.0 - 2019-06-10
 ### Added
 - `WebDriverCheckboxes` and `WebDriverRadios` helper classes to simplify interaction with checkboxes and radio buttons.
+
+### Fixed
+- Stop sending null values in Cookie object, which is against the protocol and may cause request to remote ends to fail.
+
+### Changed
+- Force Chrome to not use W3C WebDriver protocol.
+- Add workaround for Chromedriver bug [2943](https://bugs.chromium.org/p/chromedriver/issues/detail?id=2943) which breaks the protocol in Chromedriver 75.
 
 ## 1.6.0 - 2018-05-16
 ### Added
